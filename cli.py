@@ -1,5 +1,7 @@
 import json
+import os
 import sys
+from multiprocessing.pool import ThreadPool
 
 from python_graphql_client import GraphqlClient
 from prettytable import PrettyTable
@@ -37,6 +39,9 @@ def load_boards(client: GraphqlClient, conn: sqlite3.Connection):
         conn.execute(qry, [item["id"], item["name"]])
     conn.commit()
     existing_tables.add("boards")
+
+    for item in res["data"]["boards"]:
+        create_board_table(client, conn, item["id"])
 
 
 def create_board_table(client: GraphqlClient, conn: sqlite3.Connection, board_id):
@@ -94,6 +99,8 @@ def create_board_table(client: GraphqlClient, conn: sqlite3.Connection, board_id
         conn.execute(qry, [monday_type_to_sql(typ, val) for typ, val in col_values])
         conn.commit()
 
+        existing_tables.add(board_id)
+
 
 def monday_type_to_sql(typ: type, val):
     if val is None:
@@ -129,7 +136,11 @@ def print_table(cursor):
 if __name__ == '__main__':
     token = sys.argv[1]
     client = GraphqlClient(endpoint="https://api.monday.com/v2", headers={"Authorization": token})
-    conn = sqlite3.connect(":memory:")
+    db_path = "/tmp/monday.db"
+
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    conn = sqlite3.connect(db_path)
 
     load_boards(client, conn)
 
@@ -142,9 +153,6 @@ if __name__ == '__main__':
         if not board_id.startswith("b_") and board_id != "boards":
             print(f"Unknown board \"{board_id}\"")
             continue
-        if board_id not in existing_tables:
-            create_board_table(client, conn, board_id.split("b_")[1])
-            existing_tables.add(board_id)
 
         try:
             print_table(conn.execute(query))
