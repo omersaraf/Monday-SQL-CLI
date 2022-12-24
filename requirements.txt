@@ -1,0 +1,6 @@
+python-graphql-client
+prettytable
+Pygments
+sqlparse
+pygments-pprint-sql
+prompt_toolkit
